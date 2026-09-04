@@ -1,739 +1,469 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+/**
+ * DealX API — Cloudflare Worker
+ * Real product-data search across Amazon India (PA-API 5.0) and Flipkart Affiliate API.
+ *
+ * ── REQUIRED ENVIRONMENT VARIABLES / SECRETS (set in Cloudflare dashboard or wrangler) ──
+ *   AMAZON_ACCESS_KEY      - Amazon PA-API access key
+ *   AMAZON_SECRET_KEY      - Amazon PA-API secret key
+ *   AMAZON_PARTNER_TAG     - Amazon Associates partner/tracking tag
+ *   AMAZON_HOST            - e.g. "webservices.amazon.in" (optional, defaults below)
+ *   AMAZON_REGION          - e.g. "eu-west-1" (PA-API India region, optional, defaults below)
+ *   FLIPKART_API_KEY       - Flipkart Affiliate API "Fk-Affiliate-Token"
+ *   FLIPKART_AFFILIATE_ID  - Flipkart Affiliate ID ("Fk-Affiliate-Id")
+ *
+ * Set them with:
+ *   wrangler secret put AMAZON_ACCESS_KEY
+ *   wrangler secret put AMAZON_SECRET_KEY
+ *   wrangler secret put AMAZON_PARTNER_TAG
+ *   wrangler secret put FLIPKART_API_KEY
+ *   wrangler secret put FLIPKART_AFFILIATE_ID
+ *
+ * If a given set of credentials is missing, that store is reported as
+ * "unavailable" / "not_configured" — the Worker never fabricates data.
+ *
+ * ── ENDPOINTS ──
+ *   GET /health
+ *   GET /search?q=iphone 15
+ *
+ * ── TEST URLS (after deploy, replace with your worker's domain) ──
+ *   https://dealx-api.<your-subdomain>.workers.dev/health
+ *   https://dealx-api.<your-subdomain>.workers.dev/search?q=iphone
+ *
+ * ── EXAMPLE SUCCESS RESPONSE ──
+ * {
+ *   "success": true,
+ *   "query": "iphone 15",
+ *   "products": [
+ *     {
+ *       "id": "amazon-B0CHX1W1XY",
+ *       "store": "Amazon",
+ *       "title": "Apple iPhone 15 (128 GB) - Blue",
+ *       "price": 65999,
+ *       "mrp": 79900,
+ *       "discount": "17%",
+ *       "image": "https://m.media-amazon.com/images/I/xxxx.jpg",
+ *       "url": "https://www.amazon.in/dp/B0CHX1W1XY?tag=yourtag-21",
+ *       "availability": "In Stock"
+ *     }
+ *   ],
+ *   "stores": { "amazon": "success", "flipkart": "not_configured" }
+ * }
+ *
+ * ── EXAMPLE ERROR RESPONSE ──
+ * {
+ *   "success": false,
+ *   "error": "Please enter a product name"
+ * }
+ */
 
-<title>DealX - Smart Price Comparison</title>
+// ─────────────────────────────────────────────────────────────
+// CONFIG
+// ─────────────────────────────────────────────────────────────
 
-<style>
-*{
-  box-sizing:border-box;
-  margin:0;
-  padding:0;
+const DEFAULT_TIMEOUT_MS = 8000;
+const PLACEHOLDER_IMAGE = "https://dealx.example.com/assets/placeholder-product.png"; // replace with your own hosted placeholder
+
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*", // restrict to your frontend domain in production, e.g. "https://dealx.example.com"
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Max-Age": "86400",
+};
+
+function jsonResponse(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      ...CORS_HEADERS,
+    },
+  });
 }
 
-body{
-  font-family:Arial, sans-serif;
-  background:#f5f7fb;
-  color:#111827;
+function withTimeout(promise, ms, label) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
 }
 
-header{
-  background:#111827;
-  color:white;
-  padding:18px 20px;
+// ─────────────────────────────────────────────────────────────
+// AMAZON PA-API 5.0 (SearchItems) — SigV4 signed request
+// ─────────────────────────────────────────────────────────────
+
+async function hmacSha256(key, message) {
+  const enc = new TextEncoder();
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    typeof key === "string" ? enc.encode(key) : key,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  return crypto.subtle.sign("HMAC", cryptoKey, enc.encode(message));
 }
 
-.nav{
-  max-width:1100px;
-  margin:auto;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
+async function sha256Hex(message) {
+  const enc = new TextEncoder();
+  const hashBuffer = await crypto.subtle.digest("SHA-256", enc.encode(message));
+  return [...new Uint8Array(hashBuffer)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-.logo{
-  font-size:26px;
-  font-weight:800;
+function toHex(buffer) {
+  return [...new Uint8Array(buffer)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-.logo span{
-  color:#22c55e;
+async function signAmazonRequest({ accessKey, secretKey, region, host, payload }) {
+  const service = "ProductAdvertisingAPI";
+  const method = "POST";
+  const canonicalUri = "/paapi5/searchitems";
+  const target = "com.amazon.paapi5.v1.ProductAdvertisingAPIv1.SearchItems";
+
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, ""); // YYYYMMDDTHHMMSSZ
+  const dateStamp = amzDate.slice(0, 8);
+
+  const canonicalHeaders =
+    `content-encoding:amz-1.0\n` +
+    `content-type:application/json; charset=utf-8\n` +
+    `host:${host}\n` +
+    `x-amz-date:${amzDate}\n` +
+    `x-amz-target:${target}\n`;
+  const signedHeaders = "content-encoding;content-type;host;x-amz-date;x-amz-target";
+
+  const payloadHash = await sha256Hex(payload);
+  const canonicalRequest = [method, canonicalUri, "", canonicalHeaders, signedHeaders, payloadHash].join("\n");
+
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+  const stringToSign = [
+    "AWS4-HMAC-SHA256",
+    amzDate,
+    credentialScope,
+    await sha256Hex(canonicalRequest),
+  ].join("\n");
+
+  const kDate = await hmacSha256(`AWS4${secretKey}`, dateStamp);
+  const kRegion = await hmacSha256(kDate, region);
+  const kService = await hmacSha256(kRegion, service);
+  const kSigning = await hmacSha256(kService, "aws4_request");
+  const signature = toHex(await hmacSha256(kSigning, stringToSign));
+
+  const authorizationHeader =
+    `AWS4-HMAC-SHA256 Credential=${accessKey}/${credentialScope}, ` +
+    `SignedHeaders=${signedHeaders}, Signature=${signature}`;
+
+  return {
+    url: `https://${host}${canonicalUri}`,
+    headers: {
+      "content-encoding": "amz-1.0",
+      "content-type": "application/json; charset=utf-8",
+      host,
+      "x-amz-date": amzDate,
+      "x-amz-target": target,
+      Authorization: authorizationHeader,
+    },
+  };
 }
 
-.hero{
-  max-width:1000px;
-  margin:45px auto 25px;
-  padding:0 18px;
-  text-align:center;
-}
+/**
+ * Returns: { status: "success" | "not_configured" | "unavailable", products: [], errorMessage?: string }
+ */
+async function searchAmazon(query, env) {
+  const accessKey = env.AMAZON_ACCESS_KEY;
+  const secretKey = env.AMAZON_SECRET_KEY;
+  const partnerTag = env.AMAZON_PARTNER_TAG;
 
-.hero h1{
-  font-size:38px;
-  margin-bottom:12px;
-}
-
-.hero p{
-  color:#6b7280;
-  margin-bottom:25px;
-}
-
-.search-box{
-  max-width:750px;
-  margin:auto;
-  display:flex;
-  background:white;
-  border:1px solid #d1d5db;
-  border-radius:14px;
-  overflow:hidden;
-  box-shadow:0 8px 25px rgba(0,0,0,.08);
-}
-
-.search-box input{
-  flex:1;
-  border:0;
-  outline:0;
-  padding:17px;
-  font-size:16px;
-}
-
-.search-box button{
-  border:0;
-  background:#22c55e;
-  color:white;
-  padding:0 25px;
-  font-size:20px;
-  cursor:pointer;
-}
-
-.search-box button:hover{
-  background:#16a34a;
-}
-
-.container{
-  max-width:1100px;
-  margin:35px auto;
-  padding:0 18px;
-}
-
-.status{
-  text-align:center;
-  margin:20px 0;
-  font-weight:600;
-}
-
-.products{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-  gap:20px;
-}
-
-.card{
-  background:white;
-  border-radius:16px;
-  padding:15px;
-  box-shadow:0 5px 20px rgba(0,0,0,.07);
-  display:flex;
-  flex-direction:column;
-}
-
-.card img{
-  width:100%;
-  height:210px;
-  object-fit:contain;
-  border-radius:12px;
-  background:#f9fafb;
-}
-
-.card h3{
-  font-size:16px;
-  margin:13px 0 8px;
-  line-height:1.4;
-}
-
-.store{
-  color:#6b7280;
-  font-size:13px;
-  margin-bottom:8px;
-}
-
-.price{
-  font-size:21px;
-  font-weight:800;
-  color:#16a34a;
-  margin-bottom:12px;
-}
-
-.old-price{
-  color:#9ca3af;
-  text-decoration:line-through;
-  font-size:13px;
-  margin-left:7px;
-}
-
-.actions{
-  display:flex;
-  gap:8px;
-  margin-top:auto;
-}
-
-.actions button{
-  flex:1;
-  padding:11px;
-  border:0;
-  border-radius:9px;
-  cursor:pointer;
-  font-weight:700;
-}
-
-.buy{
-  background:#111827;
-  color:white;
-}
-
-.compare{
-  background:#dcfce7;
-  color:#166534;
-}
-
-.empty{
-  text-align:center;
-  padding:40px 15px;
-  color:#6b7280;
-}
-
-.error{
-  background:#fee2e2;
-  color:#991b1b;
-  padding:15px;
-  border-radius:10px;
-  margin:20px auto;
-  max-width:750px;
-  line-height:1.5;
-}
-
-@media(max-width:600px){
-  .hero h1{
-    font-size:30px;
+  if (!accessKey || !secretKey || !partnerTag) {
+    return { status: "not_configured", products: [], errorMessage: "Amazon API is not configured" };
   }
 
-  .search-box input{
-    min-width:0;
-  }
+  const host = env.AMAZON_HOST || "webservices.amazon.in";
+  const region = env.AMAZON_REGION || "eu-west-1";
 
-  .search-box button{
-    padding:0 18px;
-  }
+  const payloadObj = {
+    Keywords: query,
+    PartnerTag: partnerTag,
+    PartnerType: "Associates",
+    Marketplace: "www.amazon.in",
+    SearchIndex: "All",
+    ItemCount: 10,
+    Resources: [
+      "ItemInfo.Title",
+      "Offers.Listings.Price",
+      "Offers.Listings.SavingBasis",
+      "Offers.Listings.Availability.Message",
+      "Images.Primary.Large",
+    ],
+  };
+  const payload = JSON.stringify(payloadObj);
 
-  .products{
-    grid-template-columns:1fr 1fr;
-    gap:12px;
-  }
+  try {
+    const { url, headers } = await signAmazonRequest({ accessKey, secretKey, region, host, payload });
 
-  .card{
-    padding:10px;
-  }
+    const res = await withTimeout(
+      fetch(url, { method: "POST", headers, body: payload }),
+      DEFAULT_TIMEOUT_MS,
+      "Amazon PA-API"
+    );
 
-  .card img{
-    height:150px;
-  }
-
-  .card h3{
-    font-size:14px;
-  }
-
-  .price{
-    font-size:17px;
-  }
-}
-</style>
-</head>
-
-<body>
-
-<header>
-  <div class="nav">
-    <div class="logo">Deal<span>X</span></div>
-    <div>Smart Shopping</div>
-  </div>
-</header>
-
-<section class="hero">
-
-  <h1>Find the Best Deal</h1>
-
-  <p>
-    Search products and compare prices easily.
-  </p>
-
-  <div class="search-box">
-
-    <input
-      id="searchInput"
-      type="text"
-      placeholder="Search iPhone, Samsung, laptop..."
-      onkeydown="handleSearch(event)"
-    >
-
-    <button onclick="searchProduct()">🔍</button>
-
-  </div>
-
-</section>
-
-<div class="container">
-
-  <div id="status" class="status"></div>
-
-  <div id="errorBox"></div>
-
-  <div id="products" class="products"></div>
-
-</div>
-
-<script>
-
-/* =====================================
-   DEALX API
-===================================== */
-
-const API_URL =
-"https://dealx-api.talukdarmitu420.workers.dev/search";
-
-
-/* =====================================
-   SEARCH ON ENTER
-===================================== */
-
-function handleSearch(event){
-
-  if(event.key === "Enter"){
-    searchProduct();
-  }
-
-}
-
-
-/* =====================================
-   GET VALUE FROM OBJECT
-===================================== */
-
-function pick(obj, keys){
-
-  for(const key of keys){
-
-    if(
-      obj &&
-      obj[key] !== undefined &&
-      obj[key] !== null &&
-      obj[key] !== ""
-    ){
-      return obj[key];
+    if (res.status === 429) {
+      return { status: "unavailable", products: [], errorMessage: "Amazon API rate limit reached" };
     }
-
-  }
-
-  return "";
-
-}
-
-
-/* =====================================
-   FIND PRODUCT ARRAY
-===================================== */
-
-function getProducts(data){
-
-  if(Array.isArray(data)){
-    return data;
-  }
-
-  if(!data || typeof data !== "object"){
-    return [];
-  }
-
-  const possible = [
-    data.products,
-    data.items,
-    data.results,
-    data.data,
-    data.data?.products,
-    data.data?.items,
-    data.data?.results
-  ];
-
-  for(const item of possible){
-
-    if(Array.isArray(item)){
-      return item;
+    if (res.status === 401 || res.status === 403) {
+      return { status: "unavailable", products: [], errorMessage: "Amazon API authentication failed" };
     }
-
-  }
-
-  return [];
-
-}
-
-
-/* =====================================
-   ESCAPE HTML
-===================================== */
-
-function escapeHTML(value){
-
-  return String(value ?? "")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
-
-}
-
-
-/* =====================================
-   FORMAT PRICE
-===================================== */
-
-function formatPrice(value){
-
-  if(value === null || value === undefined || value === ""){
-    return "";
-  }
-
-  if(typeof value === "number"){
-    return "₹" + value.toLocaleString("en-IN");
-  }
-
-  return String(value);
-
-}
-
-
-/* =====================================
-   PRODUCT CARD
-===================================== */
-
-function productCard(product, index){
-
-  const title = pick(product,[
-    "title",
-    "name",
-    "product_name",
-    "productTitle"
-  ]) || "Product";
-
-  const price = pick(product,[
-    "price",
-    "sale_price",
-    "selling_price",
-    "current_price"
-  ]);
-
-  const oldPrice = pick(product,[
-    "old_price",
-    "mrp",
-    "original_price",
-    "list_price"
-  ]);
-
-  const image = pick(product,[
-    "image",
-    "image_url",
-    "imageUrl",
-    "thumbnail",
-    "thumbnail_url"
-  ]);
-
-  const store = pick(product,[
-    "store",
-    "seller",
-    "merchant",
-    "source",
-    "retailer"
-  ]) || "Online Store";
-
-  const link = pick(product,[
-    "url",
-    "link",
-    "product_url",
-    "productUrl"
-  ]);
-
-  return `
-
-    <div class="card">
-
-      <img
-        src="${escapeHTML(image || "https://via.placeholder.com/400x300?text=DealX")}"
-        alt="${escapeHTML(title)}"
-        onerror="this.src='https://via.placeholder.com/400x300?text=DealX'"
-      >
-
-      <h3>
-        ${escapeHTML(title)}
-      </h3>
-
-      <div class="store">
-        ${escapeHTML(store)}
-      </div>
-
-      <div class="price">
-
-        ${escapeHTML(formatPrice(price))}
-
-        ${
-          oldPrice
-          ? `<span class="old-price">
-              ${escapeHTML(formatPrice(oldPrice))}
-             </span>`
-          : ""
-        }
-
-      </div>
-
-      <div class="actions">
-
-        <button
-          class="buy"
-          onclick="openDeal(${index})"
-        >
-          Buy
-        </button>
-
-        <button
-          class="compare"
-          onclick="openCompare(${index})"
-        >
-          Compare
-        </button>
-
-      </div>
-
-    </div>
-
-  `;
-
-}
-
-
-/* =====================================
-   GLOBAL SEARCH RESULTS
-===================================== */
-
-let currentProducts = [];
-
-
-/* =====================================
-   SEARCH PRODUCT
-===================================== */
-
-async function searchProduct(){
-
-  const input =
-    document.getElementById("searchInput");
-
-  const status =
-    document.getElementById("status");
-
-  const products =
-    document.getElementById("products");
-
-  const errorBox =
-    document.getElementById("errorBox");
-
-  const query =
-    input.value.trim();
-
-
-  if(!query){
-
-    input.focus();
-
-    return;
-
-  }
-
-
-  status.innerText =
-    "🔎 Searching for " + query + "...";
-
-  products.innerHTML = "";
-
-  errorBox.innerHTML = "";
-
-
-  try{
-
-    const response = await fetch(API_URL,{
-
-      method:"POST",
-
-      headers:{
-        "Content-Type":"application/json"
-      },
-
-      body:JSON.stringify({
-
-        q:query,
-
-        page:1
-
-      })
-
-    });
-
-
-    const text =
-      await response.text();
-
-
-    if(!response.ok){
-
-      throw new Error(
-        "API returned HTTP " +
-        response.status +
-        ": " +
-        text.slice(0,300)
-      );
-
+    if (!res.ok) {
+      return { status: "unavailable", products: [], errorMessage: `Amazon API returned HTTP ${res.status}` };
     }
-
 
     let data;
-
-    try{
-
-      data = JSON.parse(text);
-
-    }catch{
-
-      throw new Error(
-        "API returned non-JSON response: " +
-        text.slice(0,300)
-      );
-
+    try {
+      data = await res.json();
+    } catch {
+      return { status: "unavailable", products: [], errorMessage: "Amazon API returned malformed JSON" };
     }
 
+    const items = data?.SearchResult?.Items || [];
+    const products = items
+      .map((item) => {
+        const listing = item?.Offers?.Listings?.[0];
+        const priceAmount = listing?.Price?.Amount;
+        const mrpAmount = listing?.SavingBasis?.Amount;
+        const url = item?.DetailPageURL;
+        const title = item?.ItemInfo?.Title?.DisplayValue;
+        const image = item?.Images?.Primary?.Large?.URL;
 
-    const list =
-      getProducts(data);
+        if (!url || !title || priceAmount == null) return null; // never show unclickable/incomplete products
 
+        const discount =
+          mrpAmount && mrpAmount > priceAmount
+            ? `${Math.round(((mrpAmount - priceAmount) / mrpAmount) * 100)}%`
+            : null;
 
-    currentProducts = list;
+        return {
+          id: `amazon-${item.ASIN}`,
+          store: "Amazon",
+          title,
+          price: priceAmount,
+          mrp: mrpAmount || null,
+          discount,
+          image: image || PLACEHOLDER_IMAGE,
+          url,
+          availability: listing?.Availability?.Message || "Check availability",
+        };
+      })
+      .filter(Boolean);
 
+    return { status: "success", products, errorMessage: null };
+  } catch (err) {
+    return { status: "unavailable", products: [], errorMessage: `Amazon API error: ${err.message}` };
+  }
+}
 
-    if(!list.length){
+// ─────────────────────────────────────────────────────────────
+// FLIPKART AFFILIATE API
+// ─────────────────────────────────────────────────────────────
 
-      status.innerText =
-        "No products found.";
+/**
+ * Returns: { status: "success" | "not_configured" | "unavailable", products: [], errorMessage?: string }
+ */
+async function searchFlipkart(query, env) {
+  const apiKey = env.FLIPKART_API_KEY;
+  const affiliateId = env.FLIPKART_AFFILIATE_ID;
 
-      products.innerHTML = `
+  if (!apiKey || !affiliateId) {
+    return { status: "not_configured", products: [], errorMessage: "Flipkart API is not configured" };
+  }
 
-        <div class="empty">
+  const url = `https://affiliate-api.flipkart.net/affiliate/1.0/search.json?query=${encodeURIComponent(
+    query
+  )}&resultCount=10`;
 
-          No products found for
-          <strong>${escapeHTML(query)}</strong>.
+  try {
+    const res = await withTimeout(
+      fetch(url, {
+        method: "GET",
+        headers: {
+          "Fk-Affiliate-Id": affiliateId,
+          "Fk-Affiliate-Token": apiKey,
+        },
+      }),
+      DEFAULT_TIMEOUT_MS,
+      "Flipkart Affiliate API"
+    );
 
-        </div>
-
-      `;
-
-      return;
-
+    if (res.status === 429) {
+      return { status: "unavailable", products: [], errorMessage: "Flipkart API rate limit reached" };
+    }
+    if (res.status === 401 || res.status === 403) {
+      return { status: "unavailable", products: [], errorMessage: "Flipkart API authentication failed" };
+    }
+    if (!res.ok) {
+      return { status: "unavailable", products: [], errorMessage: `Flipkart API returned HTTP ${res.status}` };
     }
 
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      return { status: "unavailable", products: [], errorMessage: "Flipkart API returned malformed JSON" };
+    }
 
-    status.innerText =
-      list.length + " products found";
+    const items = data?.products || [];
+    const products = items
+      .map((entry) => {
+        const p = entry?.productBaseInfoV1;
+        if (!p) return null;
 
+        const url = p.productUrl;
+        const title = p.title;
+        const price = p.flipkartSpecialPrice?.amount ?? p.flipkartSellingPrice?.amount;
+        const mrp = p.maximumRetailPrice?.amount;
+        const image = p.imageUrls?.["400x400"] || p.imageUrls?.["200x200"];
 
-    products.innerHTML =
-      list.map((item,index)=>
-        productCard(item,index)
-      ).join("");
+        if (!url || !title || price == null) return null;
 
+        const discount = mrp && mrp > price ? `${Math.round(((mrp - price) / mrp) * 100)}%` : null;
 
-  }catch(error){
+        return {
+          id: `flipkart-${p.productId}`,
+          store: "Flipkart",
+          title,
+          price,
+          mrp: mrp || null,
+          discount,
+          image: image || PLACEHOLDER_IMAGE,
+          url,
+          availability: p.inStock ? "In Stock" : "Out of Stock",
+        };
+      })
+      .filter(Boolean);
 
-    console.error(error);
-
-    status.innerText = "";
-
-    errorBox.innerHTML = `
-
-      <div class="error">
-
-        <strong>Could not load products.</strong><br><br>
-
-        ${escapeHTML(error.message)}
-
-        <br><br>
-
-        Please check the DealX API / Worker logs.
-
-      </div>
-
-    `;
-
+    return { status: "success", products, errorMessage: null };
+  } catch (err) {
+    return { status: "unavailable", products: [], errorMessage: `Flipkart API error: ${err.message}` };
   }
-
 }
 
+// ─────────────────────────────────────────────────────────────
+// ROUTE HANDLERS
+// ─────────────────────────────────────────────────────────────
 
-/* =====================================
-   BUY BUTTON
-===================================== */
-
-function openDeal(index){
-
-  const product =
-    currentProducts[index];
-
-  if(!product){
-    return;
-  }
-
-  const link =
-    pick(product,[
-      "url",
-      "link",
-      "product_url",
-      "productUrl"
-    ]);
-
-  if(link){
-
-    window.open(link,"_blank");
-
-  }else{
-
-    alert("Product link is not available.");
-
-  }
-
+function handleHealth() {
+  return jsonResponse({ status: "ok", service: "DealX API", version: "1.0" }, 200);
 }
 
+async function handleSearch(request, env) {
+  const { searchParams } = new URL(request.url);
+  const query = (searchParams.get("q") || "").trim();
 
-/* =====================================
-   COMPARE BUTTON
-===================================== */
-
-function openCompare(index){
-
-  const product =
-    currentProducts[index];
-
-  if(!product){
-    return;
+  if (!query) {
+    return jsonResponse({ success: false, error: "Please enter a product name" }, 400);
   }
 
-  const title =
-    pick(product,[
-      "title",
-      "name",
-      "product_name"
-    ]) || "Product";
+  // Run both store searches independently — one failing must not fail the other.
+  const [amazonResult, flipkartResult] = await Promise.all([
+    searchAmazon(query, env),
+    searchFlipkart(query, env),
+  ]);
 
-  const price =
-    pick(product,[
-      "price",
-      "sale_price",
-      "selling_price",
-      "current_price"
-    ]) || "Not available";
+  const storesStatus = {
+    amazon: amazonResult.status,
+    flipkart: flipkartResult.status,
+  };
 
-  alert(
-    "DealX Compare\n\n" +
-    title +
-    "\n\nPrice: " +
-    formatPrice(price)
+  const bothFailedHard =
+    (amazonResult.status === "unavailable" || amazonResult.status === "not_configured") &&
+    (flipkartResult.status === "unavailable" || flipkartResult.status === "not_configured") &&
+    amazonResult.products.length === 0 &&
+    flipkartResult.products.length === 0;
+
+  // If both stores are unavailable (not just "no results"), surface a 503.
+  const bothErroredAsFailure =
+    amazonResult.status === "unavailable" && flipkartResult.status === "unavailable";
+
+  if (bothErroredAsFailure) {
+    return jsonResponse(
+      {
+        success: false,
+        error: "Product search service is temporarily unavailable",
+        stores: storesStatus,
+      },
+      503
+    );
+  }
+
+  const allProducts = [...amazonResult.products, ...flipkartResult.products].sort(
+    (a, b) => a.price - b.price
   );
 
+  if (allProducts.length === 0) {
+    // Distinguish "no APIs configured at all" from "configured but genuinely no results".
+    if (
+      amazonResult.status === "not_configured" &&
+      flipkartResult.status === "not_configured"
+    ) {
+      return jsonResponse(
+        {
+          success: false,
+          error: "No product APIs are configured yet",
+          stores: storesStatus,
+        },
+        503
+      );
+    }
+
+    return jsonResponse(
+      {
+        success: true,
+        query,
+        products: [],
+        message: "No products found",
+        stores: storesStatus,
+      },
+      404
+    );
+  }
+
+  return jsonResponse(
+    {
+      success: true,
+      query,
+      products: allProducts,
+      stores: storesStatus,
+    },
+    200
+  );
 }
 
-</script>
+// ─────────────────────────────────────────────────────────────
+// WORKER ENTRYPOINT
+// ─────────────────────────────────────────────────────────────
 
-</body>
-</html>
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: CORS_HEADERS });
+    }
+
+    try {
+      if (request.method === "GET" && url.pathname === "/health") {
+        return handleHealth();
+      }
+
+      if (request.method === "GET" && url.pathname === "/search") {
+        return await handleSearch(request, env);
+      }
+
+      return jsonResponse({ success: false, error: "Not found" }, 404);
+    } catch (err) {
+      return jsonResponse(
+        { success: false, error: "Internal server error", detail: err.message },
+        500
+      );
+    }
+  },
+};
