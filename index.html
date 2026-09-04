@@ -3,498 +3,228 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#08090d">
-<title>DealX — Find the lowest price</title>
+
+<title>DealX - Smart Price Comparison</title>
 
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
-*{box-sizing:border-box;margin:0;padding:0}
+*{
+  box-sizing:border-box;
+  margin:0;
+  padding:0;
+}
 
 body{
-  font-family:Inter,Arial,sans-serif;
-  background:#08090d;
-  color:#f7f7f8;
-  min-height:100vh;
+  font-family:Arial, sans-serif;
+  background:#f5f7fb;
+  color:#111827;
 }
 
-button,input{font:inherit}
-button{cursor:pointer}
-
-.app{
-  width:100%;
-  max-width:1180px;
-  margin:auto;
-  padding:20px;
+header{
+  background:#111827;
+  color:white;
+  padding:18px 20px;
 }
 
-/* NAV */
 .nav{
+  max-width:1100px;
+  margin:auto;
   display:flex;
-  align-items:center;
   justify-content:space-between;
-  padding:8px 0 35px;
+  align-items:center;
 }
 
 .logo{
-  font-size:25px;
+  font-size:26px;
   font-weight:800;
-  letter-spacing:-1.5px;
 }
 
 .logo span{
-  background:linear-gradient(90deg,#fff,#8b7cff);
-  -webkit-background-clip:text;
-  color:transparent;
+  color:#22c55e;
 }
 
-.nav-right{
-  display:flex;
-  gap:10px;
-}
-
-.icon-btn{
-  width:42px;
-  height:42px;
-  border:1px solid #252631;
-  background:#111219;
-  color:white;
-  border-radius:14px;
-}
-
-/* HERO */
 .hero{
-  padding:25px 0 35px;
+  max-width:1000px;
+  margin:45px auto 25px;
+  padding:0 18px;
   text-align:center;
 }
 
-.badge{
-  display:inline-flex;
-  align-items:center;
-  gap:7px;
-  padding:8px 13px;
-  border:1px solid #292a38;
-  background:#11121a;
-  border-radius:100px;
-  color:#aaa9ff;
-  font-size:12px;
-  font-weight:600;
-  margin-bottom:22px;
-}
-
 .hero h1{
-  font-size:clamp(38px,7vw,70px);
-  line-height:1;
-  letter-spacing:-4px;
-  max-width:850px;
-  margin:auto;
-}
-
-.hero h1 span{
-  background:linear-gradient(100deg,#fff 20%,#9b91ff 70%,#6e62ff);
-  -webkit-background-clip:text;
-  color:transparent;
+  font-size:38px;
+  margin-bottom:12px;
 }
 
 .hero p{
-  color:#8d8e99;
-  font-size:15px;
-  margin:20px auto 28px;
+  color:#6b7280;
+  margin-bottom:25px;
 }
 
-/* SEARCH */
 .search-box{
-  max-width:700px;
+  max-width:750px;
   margin:auto;
   display:flex;
-  align-items:center;
-  gap:10px;
-  padding:8px;
-  border:1px solid #2a2b38;
-  background:#111219;
-  border-radius:22px;
-  box-shadow:0 20px 70px rgba(0,0,0,.35);
+  background:white;
+  border:1px solid #d1d5db;
+  border-radius:14px;
+  overflow:hidden;
+  box-shadow:0 8px 25px rgba(0,0,0,.08);
 }
 
 .search-box input{
   flex:1;
-  min-width:0;
   border:0;
   outline:0;
-  background:transparent;
-  color:white;
-  padding:14px;
-  font-size:14px;
+  padding:17px;
+  font-size:16px;
 }
 
-.search-box input::placeholder{
-  color:#686975;
-}
-
-.search-action{
-  width:48px;
-  height:48px;
+.search-box button{
   border:0;
-  border-radius:16px;
-  background:#fff;
-  color:#08090d;
-  font-size:18px;
-}
-
-/* CATEGORIES */
-.categories{
-  display:flex;
-  gap:9px;
-  overflow-x:auto;
-  padding:5px 0 35px;
-  scrollbar-width:none;
-}
-
-.categories::-webkit-scrollbar{
-  display:none;
-}
-
-.category{
-  white-space:nowrap;
-  padding:11px 15px;
-  border:1px solid #252631;
-  background:#111219;
-  color:#a8a9b3;
-  border-radius:100px;
-  font-size:12px;
-}
-
-.category.active{
+  background:#22c55e;
   color:white;
-  background:#20212d;
-  border-color:#44465b;
-}
-
-/* SECTION */
-.section{
-  margin-top:15px;
-  margin-bottom:42px;
-}
-
-.section-head{
-  display:flex;
-  justify-content:space-between;
-  align-items:end;
-  margin-bottom:17px;
-}
-
-.section-title{
+  padding:0 25px;
   font-size:20px;
-  font-weight:700;
-  letter-spacing:-.7px;
+  cursor:pointer;
 }
 
-.section-sub{
-  color:#6e6f7b;
-  font-size:11px;
-  margin-top:5px;
+.search-box button:hover{
+  background:#16a34a;
 }
 
-.view{
-  color:#8f88ff;
-  font-size:12px;
-}
-
-/* PRODUCTS */
-.products{
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:14px;
-}
-
-.card{
-  border:1px solid #242530;
-  background:linear-gradient(145deg,#12131a,#0e0f14);
-  border-radius:22px;
-  padding:14px;
-  transition:.25s ease;
-}
-
-.card:hover{
-  transform:translateY(-4px);
-  border-color:#44465a;
-}
-
-.product-image{
-  height:190px;
-  border-radius:16px;
-  background:linear-gradient(145deg,#1b1c25,#0b0c10);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:65px;
-  margin-bottom:15px;
-  overflow:hidden;
-}
-
-.product-image img{
-  width:100%;
-  height:100%;
-  object-fit:contain;
-}
-
-.store{
-  font-size:10px;
-  color:#777885;
-  margin-bottom:7px;
-}
-
-.product-name{
-  font-size:14px;
-  font-weight:600;
-  line-height:1.4;
-  min-height:40px;
-}
-
-.price-row{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  margin-top:13px;
-}
-
-.price{
-  font-size:19px;
-  font-weight:800;
-}
-
-.old-price{
-  font-size:11px;
-  color:#646570;
-  text-decoration:line-through;
-}
-
-.save{
-  display:inline-block;
-  margin-top:7px;
-  font-size:10px;
-  color:#76d99a;
-  background:#10251a;
-  padding:5px 7px;
-  border-radius:7px;
-}
-
-.deal-btn{
-  width:100%;
-  border:0;
-  background:#f5f5f6;
-  color:#090a0e;
-  padding:11px;
-  border-radius:12px;
-  margin-top:13px;
-  font-size:11px;
-  font-weight:700;
+.container{
+  max-width:1100px;
+  margin:35px auto;
+  padding:0 18px;
 }
 
 .status{
-  display:none;
   text-align:center;
-  color:#8d8e99;
-  font-size:12px;
-  padding:20px;
+  margin:20px 0;
+  font-weight:600;
 }
 
-.status.show{
-  display:block;
-}
-
-.empty{
-  grid-column:1/-1;
-  text-align:center;
-  padding:40px;
-  color:#777885;
-  border:1px dashed #292a38;
-  border-radius:20px;
-}
-
-/* DROP */
-.drop-grid{
+.products{
   display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:14px;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:20px;
 }
 
-.drop-card{
-  padding:20px;
-  border:1px solid #252631;
-  background:#111219;
-  border-radius:20px;
-}
-
-.drop-top{
+.card{
+  background:white;
+  border-radius:16px;
+  padding:15px;
+  box-shadow:0 5px 20px rgba(0,0,0,.07);
   display:flex;
-  justify-content:space-between;
-  color:#858692;
-  font-size:11px;
+  flex-direction:column;
 }
 
-.drop-price{
-  font-size:25px;
+.card img{
+  width:100%;
+  height:210px;
+  object-fit:contain;
+  border-radius:12px;
+  background:#f9fafb;
+}
+
+.card h3{
+  font-size:16px;
+  margin:13px 0 8px;
+  line-height:1.4;
+}
+
+.store{
+  color:#6b7280;
+  font-size:13px;
+  margin-bottom:8px;
+}
+
+.price{
+  font-size:21px;
   font-weight:800;
-  margin:12px 0 4px;
-}
-
-.drop-change{
-  color:#73d69a;
-  font-size:11px;
-}
-
-/* AI */
-.ai{
-  padding:25px;
-  border-radius:25px;
-  border:1px solid #333347;
-  background:#111219;
-}
-
-.ai-label{
-  color:#9b94ff;
-  font-size:11px;
-  font-weight:700;
+  color:#16a34a;
   margin-bottom:12px;
 }
 
-.ai h2{
-  font-size:25px;
-  letter-spacing:-1px;
-  margin-bottom:10px;
-}
-
-.ai p{
-  color:#8a8b96;
+.old-price{
+  color:#9ca3af;
+  text-decoration:line-through;
   font-size:13px;
-  line-height:1.7;
-  max-width:650px;
+  margin-left:7px;
 }
 
-.ai-button{
-  margin-top:18px;
-  padding:12px 17px;
-  border:1px solid #353649;
-  background:#191a24;
-  color:white;
-  border-radius:12px;
-  font-size:11px;
-}
-
-/* FOOTER */
-footer{
-  padding:25px 0 15px;
-  text-align:center;
-  color:#555660;
-  font-size:10px;
-}
-
-/* MODAL */
-.modal{
-  position:fixed;
-  inset:0;
-  display:none;
-  align-items:flex-end;
-  justify-content:center;
-  background:rgba(0,0,0,.7);
-  backdrop-filter:blur(8px);
-  z-index:20;
-}
-
-.modal-content{
-  width:min(600px,100%);
-  background:#111219;
-  border:1px solid #2a2b38;
-  border-radius:28px 28px 0 0;
-  padding:25px;
-}
-
-.modal-head{
+.actions{
   display:flex;
-  justify-content:space-between;
-  align-items:center;
+  gap:8px;
+  margin-top:auto;
 }
 
-.close{
-  background:#20212b;
+.actions button{
+  flex:1;
+  padding:11px;
   border:0;
-  color:white;
-  width:36px;
-  height:36px;
-  border-radius:12px;
-}
-
-.compare{
-  margin-top:20px;
-}
-
-.store-row{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  padding:15px 0;
-  border-bottom:1px solid #242530;
-}
-
-.best{
-  color:#72d899!important;
+  border-radius:9px;
+  cursor:pointer;
   font-weight:700;
 }
 
-/* RESPONSIVE */
-@media(max-width:850px){
-  .products{
-    grid-template-columns:repeat(2,1fr);
-  }
-
-  .drop-grid{
-    grid-template-columns:1fr;
-  }
+.buy{
+  background:#111827;
+  color:white;
 }
 
-@media(max-width:520px){
-  .app{
-    padding:16px;
-  }
+.compare{
+  background:#dcfce7;
+  color:#166534;
+}
 
-  .hero{
-    padding-top:15px;
-  }
+.empty{
+  text-align:center;
+  padding:40px 15px;
+  color:#6b7280;
+}
 
+.error{
+  background:#fee2e2;
+  color:#991b1b;
+  padding:15px;
+  border-radius:10px;
+  margin:20px auto;
+  max-width:750px;
+  line-height:1.5;
+}
+
+@media(max-width:600px){
   .hero h1{
-    letter-spacing:-2.5px;
+    font-size:30px;
   }
 
-  .hero p{
-    line-height:1.6;
+  .search-box input{
+    min-width:0;
+  }
+
+  .search-box button{
+    padding:0 18px;
   }
 
   .products{
-    grid-template-columns:repeat(2,1fr);
-    gap:10px;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
   }
 
   .card{
     padding:10px;
-    border-radius:17px;
   }
 
-  .product-image{
-    height:145px;
-    font-size:48px;
+  .card img{
+    height:150px;
   }
 
-  .product-name{
-    font-size:12px;
+  .card h3{
+    font-size:14px;
   }
 
   .price{
-    font-size:16px;
-  }
-
-  .section-title{
-    font-size:18px;
+    font-size:17px;
   }
 }
 </style>
@@ -502,27 +232,19 @@ footer{
 
 <body>
 
-<div class="app">
-
-<nav class="nav">
-  <div class="logo">Deal<span>X</span></div>
-
-  <div class="nav-right">
-    <button class="icon-btn" type="button">♡</button>
-    <button class="icon-btn" type="button">☰</button>
+<header>
+  <div class="nav">
+    <div class="logo">Deal<span>X</span></div>
+    <div>Smart Shopping</div>
   </div>
-</nav>
+</header>
 
 <section class="hero">
 
-  <div class="badge">✦ AI-powered price intelligence</div>
-
-  <h1>
-    Find the <span>lowest price.</span>
-  </h1>
+  <h1>Find the Best Deal</h1>
 
   <p>
-    One search. Every store. The smartest deal.
+    Search products and compare prices easily.
   </p>
 
   <div class="search-box">
@@ -530,260 +252,39 @@ footer{
     <input
       id="searchInput"
       type="text"
-      placeholder="What are you looking for today?"
+      placeholder="Search iPhone, Samsung, laptop..."
       onkeydown="handleSearch(event)"
     >
 
-    <button
-      class="search-action"
-      type="button"
-      onclick="searchProduct()"
-    >⌕</button>
+    <button onclick="searchProduct()">🔍</button>
 
   </div>
+
+</section>
+
+<div class="container">
 
   <div id="status" class="status"></div>
 
-</section>
+  <div id="errorBox"></div>
 
-<div class="categories">
-
-  <button class="category active" type="button">All</button>
-  <button class="category" type="button">📱 Electronics</button>
-  <button class="category" type="button">👟 Fashion</button>
-  <button class="category" type="button">🏠 Home</button>
-  <button class="category" type="button">💄 Beauty</button>
-  <button class="category" type="button">🎮 Gaming</button>
-  <button class="category" type="button">💻 Laptop</button>
-
-</div>
-
-<section class="section">
-
-  <div class="section-head">
-
-    <div>
-      <div class="section-title">🔥 Trending Deals</div>
-      <div class="section-sub">
-        Popular products people are comparing
-      </div>
-    </div>
-
-    <div class="view">View all →</div>
-
-  </div>
-
-  <div id="productGrid" class="products">
-
-    <div class="card">
-      <div class="product-image">📱</div>
-      <div class="store">Multiple stores</div>
-      <div class="product-name">
-        Samsung Galaxy S25 256GB
-      </div>
-
-      <div class="price-row">
-        <div class="price">₹69,999</div>
-        <div class="old-price">₹74,999</div>
-      </div>
-
-      <div class="save">Save ₹5,000</div>
-
-      <button
-        class="deal-btn"
-        type="button"
-        onclick="openCompare('Samsung Galaxy S25 256GB')"
-      >
-        Compare prices →
-      </button>
-    </div>
-
-    <div class="card">
-      <div class="product-image">💻</div>
-      <div class="store">Multiple stores</div>
-      <div class="product-name">
-        Apple MacBook Air M4
-      </div>
-
-      <div class="price-row">
-        <div class="price">₹94,990</div>
-        <div class="old-price">₹99,900</div>
-      </div>
-
-      <div class="save">Save ₹4,910</div>
-
-      <button
-        class="deal-btn"
-        type="button"
-        onclick="openCompare('Apple MacBook Air M4')"
-      >
-        Compare prices →
-      </button>
-    </div>
-
-    <div class="card">
-      <div class="product-image">🎧</div>
-      <div class="store">Multiple stores</div>
-      <div class="product-name">
-        Sony Wireless Headphones
-      </div>
-
-      <div class="price-row">
-        <div class="price">₹8,999</div>
-        <div class="old-price">₹11,990</div>
-      </div>
-
-      <div class="save">Save ₹2,991</div>
-
-      <button
-        class="deal-btn"
-        type="button"
-        onclick="openCompare('Sony Wireless Headphones')"
-      >
-        Compare prices →
-      </button>
-    </div>
-
-    <div class="card">
-      <div class="product-image">⌚</div>
-      <div class="store">Multiple stores</div>
-      <div class="product-name">
-        Apple Watch Series
-      </div>
-
-      <div class="price-row">
-        <div class="price">₹39,499</div>
-        <div class="old-price">₹44,900</div>
-      </div>
-
-      <div class="save">Save ₹5,401</div>
-
-      <button
-        class="deal-btn"
-        type="button"
-        onclick="openCompare('Apple Watch Series')"
-      >
-        Compare prices →
-      </button>
-    </div>
-
-  </div>
-
-</section>
-
-<section class="section">
-
-  <div class="section-head">
-
-    <div>
-      <div class="section-title">↓ Biggest Price Drops</div>
-      <div class="section-sub">
-        Products getting cheaper right now
-      </div>
-    </div>
-
-  </div>
-
-  <div class="drop-grid">
-
-    <div class="drop-card">
-      <div class="drop-top">
-        <span>Samsung</span>
-        <span>Today</span>
-      </div>
-      <div class="drop-price">₹69,999</div>
-      <div class="drop-change">↓ 6.7% price drop</div>
-    </div>
-
-    <div class="drop-card">
-      <div class="drop-top">
-        <span>Apple</span>
-        <span>Today</span>
-      </div>
-      <div class="drop-price">₹94,990</div>
-      <div class="drop-change">↓ 4.9% price drop</div>
-    </div>
-
-    <div class="drop-card">
-      <div class="drop-top">
-        <span>Sony</span>
-        <span>Today</span>
-      </div>
-      <div class="drop-price">₹8,999</div>
-      <div class="drop-change">↓ 24.9% price drop</div>
-    </div>
-
-  </div>
-
-</section>
-
-<section class="section">
-
-  <div class="ai">
-
-    <div class="ai-label">✦ DEALX AI VERDICT</div>
-
-    <h2>Is this actually a good deal?</h2>
-
-    <p>
-      Search any product above and DealX will help you
-      compare available prices. We are building smarter
-      deal intelligence for every shopper.
-    </p>
-
-    <button
-      class="ai-button"
-      type="button"
-      onclick="document.getElementById('searchInput').focus()"
-    >
-      Search a product →
-    </button>
-
-  </div>
-
-</section>
-
-<footer>
-  © 2026 DealX · Find the lowest price
-</footer>
-
-</div>
-
-<div
-  id="compareModal"
-  class="modal"
-  onclick="closeCompare(event)"
->
-
-  <div
-    class="modal-content"
-    onclick="event.stopPropagation()"
-  >
-
-    <div class="modal-head">
-
-      <h3 id="compareTitle">
-        Compare prices
-      </h3>
-
-      <button
-        class="close"
-        type="button"
-        onclick="closeCompare()"
-      >×</button>
-
-    </div>
-
-    <div id="compareBody" class="compare"></div>
-
-  </div>
+  <div id="products" class="products"></div>
 
 </div>
 
 <script>
 
+/* =====================================
+   DEALX API
+===================================== */
+
 const API_URL =
-  "https://dealx-api.talukdarmitu420.workers.dev/search";
+"https://dealx-api.talukdarmitu420.workers.dev/search";
+
+
+/* =====================================
+   SEARCH ON ENTER
+===================================== */
 
 function handleSearch(event){
 
@@ -793,49 +294,22 @@ function handleSearch(event){
 
 }
 
-function getArray(data){
 
-  if(Array.isArray(data)){
-    return data;
-  }
+/* =====================================
+   GET VALUE FROM OBJECT
+===================================== */
 
-  if(data && Array.isArray(data.products)){
-    return data.products;
-  }
-
-  if(data && Array.isArray(data.items)){
-    return data.items;
-  }
-
-  if(data && Array.isArray(data.results)){
-    return data.results;
-  }
-
-  if(data && data.data && Array.isArray(data.data)){
-    return data.data;
-  }
-
-  if(data && data.data &&
-     Array.isArray(data.data.products)){
-    return data.data.products;
-  }
-
-  return [];
-}
-
-function pick(object,keys){
+function pick(obj, keys){
 
   for(const key of keys){
 
     if(
-      object &&
-      object[key] !== undefined &&
-      object[key] !== null &&
-      String(object[key]).trim() !== ""
+      obj &&
+      obj[key] !== undefined &&
+      obj[key] !== null &&
+      obj[key] !== ""
     ){
-
-      return object[key];
-
+      return obj[key];
     }
 
   }
@@ -844,100 +318,362 @@ function pick(object,keys){
 
 }
 
-function money(value){
 
-  if(
-    value === null ||
-    value === undefined ||
-    value === ""
-  ){
+/* =====================================
+   FIND PRODUCT ARRAY
+===================================== */
 
-    return "Price unavailable";
+function getProducts(data){
+
+  if(Array.isArray(data)){
+    return data;
+  }
+
+  if(!data || typeof data !== "object"){
+    return [];
+  }
+
+  const possible = [
+    data.products,
+    data.items,
+    data.results,
+    data.data,
+    data.data?.products,
+    data.data?.items,
+    data.data?.results
+  ];
+
+  for(const item of possible){
+
+    if(Array.isArray(item)){
+      return item;
+    }
 
   }
 
-  if(typeof value === "number"){
-
-    return "₹" +
-      value.toLocaleString("en-IN");
-
-  }
-
-  const text = String(value);
-
-  if(text.includes("₹")){
-    return text;
-  }
-
-  return text;
+  return [];
 
 }
+
+
+/* =====================================
+   ESCAPE HTML
+===================================== */
 
 function escapeHTML(value){
 
-  return String(value).replace(
-    /[&<>"']/g,
-    function(character){
-
-      const map = {
-        "&":"&amp;",
-        "<":"&lt;",
-        ">":"&gt;",
-        '"':"&quot;",
-        "'":"&#39;"
-      };
-
-      return map[character];
-
-    }
-  );
+  return String(value ?? "")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
 
 }
 
-function productCard(product){
 
-  const name =
-    pick(product,[
-      "title",
-      "name",
-      "product_name",
-      "productName"
-    ]) || "Product";
+/* =====================================
+   FORMAT PRICE
+===================================== */
 
-  const price =
-    pick(product,[
-      "price",
-      "sale_price",
-      "salePrice",
-      "current_price",
-      "currentPrice"
-    ]);
+function formatPrice(value){
 
-  const oldPrice =
-    pick(product,[
-      "old_price",
-      "oldPrice",
-      "mrp",
-      "original_price",
-      "originalPrice"
-    ]);
+  if(value === null || value === undefined || value === ""){
+    return "";
+  }
 
-  const image =
-    pick(product,[
-      "image",
-      "image_url",
-      "imageUrl",
-      "thumbnail",
-      "thumbnail_url"
-    ]);
+  if(typeof value === "number"){
+    return "₹" + value.toLocaleString("en-IN");
+  }
 
-  const store =
-    pick(product,[
-      "store",
-      "merchant",
-      "source",
-      "retailer"
-    ]) || "Online store";
+  return String(value);
+
+}
+
+
+/* =====================================
+   PRODUCT CARD
+===================================== */
+
+function productCard(product, index){
+
+  const title = pick(product,[
+    "title",
+    "name",
+    "product_name",
+    "productTitle"
+  ]) || "Product";
+
+  const price = pick(product,[
+    "price",
+    "sale_price",
+    "selling_price",
+    "current_price"
+  ]);
+
+  const oldPrice = pick(product,[
+    "old_price",
+    "mrp",
+    "original_price",
+    "list_price"
+  ]);
+
+  const image = pick(product,[
+    "image",
+    "image_url",
+    "imageUrl",
+    "thumbnail",
+    "thumbnail_url"
+  ]);
+
+  const store = pick(product,[
+    "store",
+    "seller",
+    "merchant",
+    "source",
+    "retailer"
+  ]) || "Online Store";
+
+  const link = pick(product,[
+    "url",
+    "link",
+    "product_url",
+    "productUrl"
+  ]);
+
+  return `
+
+    <div class="card">
+
+      <img
+        src="${escapeHTML(image || "https://via.placeholder.com/400x300?text=DealX")}"
+        alt="${escapeHTML(title)}"
+        onerror="this.src='https://via.placeholder.com/400x300?text=DealX'"
+      >
+
+      <h3>
+        ${escapeHTML(title)}
+      </h3>
+
+      <div class="store">
+        ${escapeHTML(store)}
+      </div>
+
+      <div class="price">
+
+        ${escapeHTML(formatPrice(price))}
+
+        ${
+          oldPrice
+          ? `<span class="old-price">
+              ${escapeHTML(formatPrice(oldPrice))}
+             </span>`
+          : ""
+        }
+
+      </div>
+
+      <div class="actions">
+
+        <button
+          class="buy"
+          onclick="openDeal(${index})"
+        >
+          Buy
+        </button>
+
+        <button
+          class="compare"
+          onclick="openCompare(${index})"
+        >
+          Compare
+        </button>
+
+      </div>
+
+    </div>
+
+  `;
+
+}
+
+
+/* =====================================
+   GLOBAL SEARCH RESULTS
+===================================== */
+
+let currentProducts = [];
+
+
+/* =====================================
+   SEARCH PRODUCT
+===================================== */
+
+async function searchProduct(){
+
+  const input =
+    document.getElementById("searchInput");
+
+  const status =
+    document.getElementById("status");
+
+  const products =
+    document.getElementById("products");
+
+  const errorBox =
+    document.getElementById("errorBox");
+
+  const query =
+    input.value.trim();
+
+
+  if(!query){
+
+    input.focus();
+
+    return;
+
+  }
+
+
+  status.innerText =
+    "🔎 Searching for " + query + "...";
+
+  products.innerHTML = "";
+
+  errorBox.innerHTML = "";
+
+
+  try{
+
+    const response = await fetch(API_URL,{
+
+      method:"POST",
+
+      headers:{
+        "Content-Type":"application/json"
+      },
+
+      body:JSON.stringify({
+
+        q:query,
+
+        page:1
+
+      })
+
+    });
+
+
+    const text =
+      await response.text();
+
+
+    if(!response.ok){
+
+      throw new Error(
+        "API returned HTTP " +
+        response.status +
+        ": " +
+        text.slice(0,300)
+      );
+
+    }
+
+
+    let data;
+
+    try{
+
+      data = JSON.parse(text);
+
+    }catch{
+
+      throw new Error(
+        "API returned non-JSON response: " +
+        text.slice(0,300)
+      );
+
+    }
+
+
+    const list =
+      getProducts(data);
+
+
+    currentProducts = list;
+
+
+    if(!list.length){
+
+      status.innerText =
+        "No products found.";
+
+      products.innerHTML = `
+
+        <div class="empty">
+
+          No products found for
+          <strong>${escapeHTML(query)}</strong>.
+
+        </div>
+
+      `;
+
+      return;
+
+    }
+
+
+    status.innerText =
+      list.length + " products found";
+
+
+    products.innerHTML =
+      list.map((item,index)=>
+        productCard(item,index)
+      ).join("");
+
+
+  }catch(error){
+
+    console.error(error);
+
+    status.innerText = "";
+
+    errorBox.innerHTML = `
+
+      <div class="error">
+
+        <strong>Could not load products.</strong><br><br>
+
+        ${escapeHTML(error.message)}
+
+        <br><br>
+
+        Please check the DealX API / Worker logs.
+
+      </div>
+
+    `;
+
+  }
+
+}
+
+
+/* =====================================
+   BUY BUTTON
+===================================== */
+
+function openDeal(index){
+
+  const product =
+    currentProducts[index];
+
+  if(!product){
+    return;
+  }
 
   const link =
     pick(product,[
@@ -947,255 +683,53 @@ function productCard(product){
       "productUrl"
     ]);
 
-  return `
-    <div class="card">
-
-      <div class="product-image">
-
-        ${
-          image
-          ?
-          `<img
-            src="${escapeHTML(image)}"
-            alt="${escapeHTML(name)}"
-            loading="lazy"
-            onerror="
-              this.style.display='none';
-              this.parentElement.textContent='🛍️';
-            "
-          >`
-          :
-          "🛍️"
-        }
-
-      </div>
-
-      <div class="store">
-        ${escapeHTML(store)}
-      </div>
-
-      <div class="product-name">
-        ${escapeHTML(name)}
-      </div>
-
-      <div class="price-row">
-
-        <div class="price">
-          ${money(price)}
-        </div>
-
-        ${
-          oldPrice
-          ?
-          `<div class="old-price">
-             ${money(oldPrice)}
-           </div>`
-          :
-          ""
-        }
-
-      </div>
-
-      ${
-        oldPrice && price
-        ?
-        `<div class="save">
-           Compare deal
-         </div>`
-        :
-        ""
-      }
-
-      <button
-        class="deal-btn"
-        type="button"
-        onclick='openDeal(
-          ${JSON.stringify(link)},
-          ${JSON.stringify(name)}
-        )'
-      >
-        View deal →
-      </button>
-
-    </div>
-  `;
-
-}
-
-async function searchProduct(){
-
-  const input =
-    document.getElementById("searchInput");
-
-  const grid =
-    document.getElementById("productGrid");
-
-  const status =
-    document.getElementById("status");
-
-  const value =
-    input.value.trim();
-
-  if(!value){
-
-    input.focus();
-    return;
-
-  }
-
-  status.textContent =
-    "Searching DealX…";
-
-  status.classList.add("show");
-
-  grid.innerHTML = "";
-
-  try{
-
-    const response =
-      await fetch(
-        API_URL,
-        {
-          method:"POST",
-
-          headers:{
-            "Content-Type":
-              "application/json"
-          },
-
-          body:JSON.stringify({
-            q:value,
-            page:1
-          })
-        }
-      );
-
-    if(!response.ok){
-
-      throw new Error(
-        "API request failed: " +
-        response.status
-      );
-
-    }
-
-    const data =
-      await response.json();
-
-    const products =
-      getArray(data);
-
-    status.classList.remove("show");
-
-    if(!products.length){
-
-      grid.innerHTML = `
-        <div class="empty">
-          No products found for
-          <strong>${escapeHTML(value)}</strong>.
-          <br><br>
-          Try another product name.
-        </div>
-      `;
-
-      return;
-
-    }
-
-    grid.innerHTML =
-      products
-      .slice(0,20)
-      .map(productCard)
-      .join("");
-
-  }catch(error){
-
-    console.error(error);
-
-    status.textContent =
-      "Search failed. Please try again.";
-
-    status.classList.add("show");
-
-    grid.innerHTML = `
-      <div class="empty">
-        Could not load products right now.
-        <br><br>
-        Please try again.
-      </div>
-    `;
-
-  }
-
-}
-
-function openDeal(link,name){
-
   if(link){
 
-    window.open(
-      link,
-      "_blank",
-      "noopener,noreferrer"
-    );
+    window.open(link,"_blank");
 
   }else{
 
-    alert(
-      "Deal link is not available for " +
-      name
-    );
+    alert("Product link is not available.");
 
   }
 
 }
 
-function openCompare(name){
 
-  document.getElementById(
-    "compareTitle"
-  ).textContent = name;
+/* =====================================
+   COMPARE BUTTON
+===================================== */
 
-  document.getElementById(
-    "compareBody"
-  ).innerHTML = `
-    <div class="store-row">
-      <span>DealX</span>
-      <strong class="best">
-        Search live prices ↑
-      </strong>
-    </div>
+function openCompare(index){
 
-    <p style="
-      color:#8a8b96;
-      font-size:12px;
-      line-height:1.6;
-      margin-top:15px;
-    ">
-      Use the search box to get the latest
-      available product results.
-    </p>
-  `;
+  const product =
+    currentProducts[index];
 
-  document.getElementById(
-    "compareModal"
-  ).style.display = "flex";
-
-}
-
-function closeCompare(event){
-
-  if(
-    !event ||
-    event.target ===
-    document.getElementById("compareModal")
-  ){
-
-    document.getElementById(
-      "compareModal"
-    ).style.display = "none";
-
+  if(!product){
+    return;
   }
+
+  const title =
+    pick(product,[
+      "title",
+      "name",
+      "product_name"
+    ]) || "Product";
+
+  const price =
+    pick(product,[
+      "price",
+      "sale_price",
+      "selling_price",
+      "current_price"
+    ]) || "Not available";
+
+  alert(
+    "DealX Compare\n\n" +
+    title +
+    "\n\nPrice: " +
+    formatPrice(price)
+  );
 
 }
 
